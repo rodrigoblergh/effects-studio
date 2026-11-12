@@ -2,6 +2,7 @@
 #include "AEConfig.h"
 #include "AE_GeneralPlug.h"
 #include "SearchPanel.h"
+#include "CaptureSupport.h"
 #include "Aliases.h"
 #include <algorithm>
 #include <map>
@@ -49,7 +50,7 @@ struct Snapshot {
 struct State {
  SPBasicSuite* basic=nullptr;AEGP_PluginID plugin=0;AEGP_Command command=0;
  bool ready=false,dying=false;unsigned depth=0;std::uint64_t generation=0;
- Snapshot snapshot;std::vector<effectstudio_mac::Entry> catalog;
+ Snapshot snapshot;effectstudio_mac::SnapshotImage lastCapture;std::vector<effectstudio_mac::Entry> catalog;
  std::map<std::string,AEGP_InstalledEffectKey> effectKeys;
 };
 struct Callback {State* state;explicit Callback(State* s):state(s){++state->depth;}~Callback(){if(--state->depth==0&&state->dying)delete state;}};
@@ -177,14 +178,23 @@ void Apply(State&s,const effectstudio_mac::Choice& choice){
  {Undo undo(api);{Quiet quiet(api);for(auto layer:targets){if(s.dying)break;EffectRef effect(api);if(api.effect->AEGP_ApplyEffect(s.plugin,layer,found->second,&effect.handle)==A_Err_NONE&&effect.handle)++applied;else ++failed;}}undo.End();}
  if(!s.dying&&(skipped||failed)){std::string report="Applied to "+std::to_string(applied)+" layer(s); skipped "+std::to_string(skipped)+", failed "+std::to_string(failed)+". Undo once to restore applied changes.";Report(s,report.c_str());}
 }
+#include "NativeCapture.inl"
 A_Err Command(AEGP_GlobalRefcon global,AEGP_CommandRefcon,AEGP_Command command,AEGP_HookPriority,A_Boolean,A_Boolean* handled){auto*s=reinterpret_cast<State*>(global);if(!s||s->dying||!s->ready||command!=s->command)return A_Err_NONE;Callback scope(s);if(handled)*handled=TRUE;
  try{if(effectstudio_mac::IsOpen()){effectstudio_mac::CloseSearch();return A_Err_NONE;}API api(s->basic);Snapshot snapshot;AEGP_CompH comp=nullptr;bool compatible=false;
- if(!Selection(*s,api,snapshot,comp,compatible)||!compatible){if(!s->dying)Report(*s,"Select unlocked visual layers in a composition first.");return A_Err_NONE;}
+ Selection(*s,api,snapshot,comp,compatible);
  Catalog(*s,api);if(s->dying)return A_Err_NONE;s->snapshot=std::move(snapshot);++s->generation;
  if(!effectstudio_mac::OpenSearch(s->catalog,(unsigned)s->snapshot.ids.size(),s->generation))Report(*s,"Effect Studio search could not open.");
  }catch(...){if(!s->dying)Report(*s,"Effect Studio could not read effects or selection.");}return A_Err_NONE;}
 A_Err Update(AEGP_GlobalRefcon global,AEGP_UpdateMenuRefcon,AEGP_WindowType){auto*s=reinterpret_cast<State*>(global);if(!s||s->dying||!s->ready)return A_Err_NONE;Callback scope(s);try{Suite<AEGP_CommandSuite1> commands(s->basic,kAEGPCommandSuite,kAEGPCommandSuiteVersion1);Check(commands->AEGP_EnableCommand(s->command));}catch(...){}return A_Err_NONE;}
-A_Err Idle(AEGP_GlobalRefcon global,AEGP_IdleRefcon,A_long* sleep){auto*s=reinterpret_cast<State*>(global);if(sleep)*sleep=1;if(!s||s->dying||!s->ready)return A_Err_NONE;Callback scope(s);effectstudio_mac::Choice choice;if(effectstudio_mac::TakeChoice(choice)){try{Apply(*s,choice);}catch(...){if(!s->dying)Report(*s,"Apply did not finish. Undo once to restore any completed changes.");}}return A_Err_NONE;}
+A_Err Idle(AEGP_GlobalRefcon global,AEGP_IdleRefcon,A_long* sleep){auto*s=reinterpret_cast<State*>(global);if(sleep)*sleep=1;if(!s||s->dying||!s->ready||s->depth)return A_Err_NONE;Callback scope(s);effectstudio_mac::Choice choice;if(effectstudio_mac::TakeChoice(choice)){try{Apply(*s,choice);}catch(...){if(!s->dying)Report(*s,"Apply did not finish. Undo once to restore any completed changes.");}return A_Err_NONE;}
+ effectstudio_mac::HostAction action;std::uint64_t actionGeneration=0;
+ if(effectstudio_mac::TakeHostAction(action,actionGeneration)){
+  if(actionGeneration!=s->generation||!NSApp.active)return A_Err_NONE;
+  try{CaptureSnapshot(*s,action==effectstudio_mac::HostAction::SaveCapture);}catch(const std::exception& e){if(!s->dying)Report(*s,e.what());}catch(...){if(!s->dying)Report(*s,"Composition snapshot did not complete.");}
+  return A_Err_NONE;
+ }
+ if(NSApp.active&&effectstudio_mac::IsBrowserOpen())try{API api(s->basic);Snapshot snapshot;AEGP_CompH comp=nullptr;bool compatible=false;Selection(*s,api,snapshot,comp,compatible);if(!s->dying&&(snapshot.item!=s->snapshot.item||snapshot.itemId!=s->snapshot.itemId||snapshot.ids!=s->snapshot.ids)){s->snapshot=std::move(snapshot);++s->generation;effectstudio_mac::UpdateSelection((unsigned)s->snapshot.ids.size(),s->generation);}}catch(...){}
+ return A_Err_NONE;}
 A_Err Death(AEGP_GlobalRefcon global,AEGP_DeathRefcon){auto*s=reinterpret_cast<State*>(global);if(!s)return A_Err_NONE;s->dying=true;s->ready=false;effectstudio_mac::Shutdown();if(!s->depth)delete s;return A_Err_NONE;}
 }
 extern "C" __attribute__((visibility("default"))) A_Err EntryPointFunc(SPBasicSuite* basic,A_long,A_long,AEGP_PluginID plugin,AEGP_GlobalRefcon* global){if(!basic||!global)return A_Err_GENERIC;*global=nullptr;

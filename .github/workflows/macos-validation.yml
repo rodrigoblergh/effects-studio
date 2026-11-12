@@ -7,20 +7,25 @@ permissions:
   contents: read
 jobs:
   appkit:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Build native Apple Silicon UI
         run: |
-          test "$(uname -m)" = arm64
-          cmake -S native/macOS/EffectStudio -B build/mac-ui -DCMAKE_OSX_ARCHITECTURES=arm64
+          uname -m
+          cmake -S native/macOS/EffectStudio -B build/mac-ui -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
           cmake --build build/mac-ui --parallel 3
+          ctest --test-dir build/mac-ui --output-on-failure
       - name: Preserve development preview
         run: |
           ditto -c -k --sequesterRsrc --keepParent build/mac-ui/EffectStudioMacPreview.app build/EffectStudioMacPreview.zip
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Effect-Studio-Mac-UI-development-preview
+          name: Effect-Studio-Mac-UI-development-preview-${{ matrix.runner }}
           path: build/EffectStudioMacPreview.zip
           retention-days: 7
