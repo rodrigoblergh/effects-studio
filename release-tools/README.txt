@@ -4,6 +4,20 @@ Key generation is an explicit maintainer operation. The owner selected GitHub
 rodrigoblergh/effects-studio. Signing/key scripts never upload anything;
 Publish-Release.ps1 uploads only when explicitly invoked without -WhatIf.
 
+Public release numbering starts at GitHub tag v1, product/VERSION/manifest version
+1.0, package Effect-Studio-v1.zip. Earlier 1.x builds were development betas; their
+historical prereleases remain available and must not be relabeled or deleted.
+Public feeds use update-v1-stable/stable.json and update-v1-beta/beta.json.
+Every new public manifest signs releaseLine:"v1". Both updater and elevated
+installer require this field, rejecting old signed beta manifests that lack it.
+Separate URLs/preferences alone do not prevent replay when the same key is used.
+Public updater preferences live under EffectStudio/updater/v1. Do not migrate
+legacy pending downloads, selected channel, or highest-seen release values into
+this namespace. Product favorites/aliases and ordinary preferences are preserved.
+First public installation is manual: legacy 1.7 updaters correctly reject 1.0 as a
+downgrade. Do not weaken that check or publish 1.0 onto their old feeds to force an
+automatic migration. Future public updates increase from 1.0 within the new feeds.
+
 1. Run New-SigningKey.ps1 once, explicitly, with a NEW private directory outside
    this workspace and all package staging folders. The script restricts its ACL
    to the current Windows account before writing a 4096-bit RSA private XML key.
@@ -41,7 +55,7 @@ Publish-Release.ps1 uploads only when explicitly invoked without -WhatIf.
 Wire contract: JSON envelope {payload,signature}, both Base64. The payload is raw
 UTF-8 JSON bytes. Signature is RSA SHA256 PKCS#1 v1.5 over exactly those bytes;
 verifiers must not deserialize/re-serialize before verifying. Payload contains
-version, channel, minAeMajor, maxAeMajor, packageUrl, packageSha256, packageBytes,
+releaseLine (exactly "v1"), version, channel, minAeMajor, maxAeMajor, packageUrl, packageSha256, packageBytes,
 installerRelativePath, issuedUtc and expiresUtc. Fixed installerRelativePath is
 InstallEffectStudio.exe. Bounds: envelope256 KiB, payload64 KiB, package200 MiB.
 
@@ -54,10 +68,15 @@ mark. Expiry and a current-version comparison alone are not complete rollback de
 
 Use ephemeral test keys and isolated directories for tests. Never use the release
 private key in automated tests, logs, screenshots, example config or source control.
+Run both Test-ReleaseManifest.ps1 and Test-PublisherExecution.ps1 with new test
+directories. The latter compiles a real fake gh.exe and exercises subprocess
+argument binding, upload ordering, matching-asset retry and tampered-asset refusal
+without network access. A -WhatIf-only test does not exercise CLI dispatch.
 
 RSA feed signatures are separate from Windows Authenticode code signing. They
 authenticate the package to the updater, but do not make Windows show a verified
 publisher or remove SmartScreen/UAC reputation prompts. Those require a separate
 Windows code-signing certificate and signing process.
+
 
 

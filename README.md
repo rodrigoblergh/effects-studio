@@ -12,7 +12,7 @@ The current supported release targets **Windows x64 and After Effects 2026**. Se
 
 ## Updates
 
-Version 1.7 adds an Updates button in Settings. Existing users must install the complete updater-enabled package once.
+The first public release is **v1**, shown as **1.0** inside the plug-in. All earlier 1.x builds were development betas. Beta users must install the complete v1 package once; subsequent public releases use the Updates button in Settings.
 
 - Startup checks are enabled by default, at most once a day; you can disable them.
 - Automatic downloads are optional and off by default.
@@ -32,4 +32,6 @@ The camera copies a composition snapshot to the clipboard. Save asks for a desti
 
 ## Release channels
 
-Version downloads are stored in immutable version releases. The `update-stable` and `update-beta` releases contain signed update metadata, not installers. Download a version ZIP to install manually.
+Version downloads are stored in immutable version releases. The `update-v1-stable` and `update-v1-beta` releases contain signed update metadata, not installers. Download a version ZIP to install manually.
+
+Public update manifests identify the v1 release line. Historical beta feeds, downloaded updates, and update-version records are kept separate, so an old beta cannot be offered as a newer public release. If you roll back to a historical beta, install v1 manually to return to public releases.

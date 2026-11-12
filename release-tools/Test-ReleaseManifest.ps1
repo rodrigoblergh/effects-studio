@@ -21,7 +21,7 @@ try {
  $bytes=[Convert]::FromBase64String($envelope.payload);$signature=[Convert]::FromBase64String($envelope.signature)
  Assert ($rsa.VerifyData($bytes,[Security.Cryptography.CryptoConfig]::MapNameToOID('SHA256'),$signature)) 'Signature did not verify'
  $manifest=[Text.Encoding]::UTF8.GetString($bytes)|ConvertFrom-Json
- Assert ($manifest.channel -ceq 'stable' -and $manifest.version -ceq '1.7.1' -and $manifest.installerRelativePath -ceq 'InstallEffectStudio.exe') 'Wrong manifest contract'
+ Assert ($manifest.releaseLine -ceq 'v1' -and $manifest.channel -ceq 'stable' -and $manifest.version -ceq '1.7.1' -and $manifest.installerRelativePath -ceq 'InstallEffectStudio.exe') 'Wrong manifest contract'
  Assert ($manifest.packageSha256 -ceq (Get-FileHash -LiteralPath $zip).Hash.ToLowerInvariant()) 'Wrong package hash'
  Assert ($manifest.packageBytes -eq (Get-Item -LiteralPath $zip).Length) 'Wrong package size'
  Assert (([DateTime]::Parse($manifest.expiresUtc)-[DateTime]::Parse($manifest.issuedUtc)).TotalDays -eq 14) 'Wrong validity'

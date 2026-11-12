@@ -43,7 +43,7 @@ try {
  $rsa.FromXmlString($privateXml)
  if($rsa.KeySize -lt 3072 -or $rsa.PublicOnly){throw 'A private RSA key of at least 3072 bits is required.'}
  $now=[DateTime]::UtcNow
- $payload=[ordered]@{version=$Version;channel=$Channel;minAeMajor=$MinAeMajor;maxAeMajor=$MaxAeMajor;packageUrl=$uri.AbsoluteUri;packageSha256=(Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant();packageBytes=[long]$file.Length;installerRelativePath='InstallEffectStudio.exe';issuedUtc=$now.ToString('o');expiresUtc=$now.AddDays($ValidDays).ToString('o')}
+ $payload=[ordered]@{releaseLine='v1';version=$Version;channel=$Channel;minAeMajor=$MinAeMajor;maxAeMajor=$MaxAeMajor;packageUrl=$uri.AbsoluteUri;packageSha256=(Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant();packageBytes=[long]$file.Length;installerRelativePath='InstallEffectStudio.exe';issuedUtc=$now.ToString('o');expiresUtc=$now.AddDays($ValidDays).ToString('o')}
  $bytes=[Text.Encoding]::UTF8.GetBytes(($payload|ConvertTo-Json -Compress))
  if($bytes.Length -gt 65536){throw 'Manifest payload too large.'}
  $signature=$rsa.SignData($bytes,[Security.Cryptography.CryptoConfig]::MapNameToOID('SHA256'))
