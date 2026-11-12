@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "stableManifestUrl": "https://github.com/rodrigoblergh/effects-studio/releases/download/update-stable/stable.json",
+  "betaManifestUrl": "https://github.com/rodrigoblergh/effects-studio/releases/download/update-beta/beta.json",
+  "pinnedPublicKeyXml": ""
+}

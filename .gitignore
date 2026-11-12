@@ -1,0 +1,7 @@
+signing-key.xml
+*.pfx
+*.p12
+*.pem
+*.key
+private/
+*.zip
