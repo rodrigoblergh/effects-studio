@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.24)
+if(NOT CMAKE_HOST_APPLE)
+ message(FATAL_ERROR "Effect Studio AppKit targets require macOS with Xcode command-line tools; Windows binaries cannot be renamed into Mac plugins.")
+endif()
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Native Apple Silicon and Intel slices")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS")
+project(EffectStudioMac LANGUAGES CXX OBJCXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_OBJCXX_STANDARD 17)
+set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+add_library(EffectStudioMacUI STATIC SearchPanel.mm)
+target_compile_options(EffectStudioMacUI PRIVATE -fobjc-arc -Wall -Wextra)
+target_link_libraries(EffectStudioMacUI PUBLIC "-framework AppKit")
+add_executable(EffectStudioMacPreview MACOSX_BUNDLE Preview.mm)
+target_compile_options(EffectStudioMacPreview PRIVATE -fobjc-arc)
+target_link_libraries(EffectStudioMacPreview PRIVATE EffectStudioMacUI)
+set(AE_SDK_ROOT "" CACHE PATH "External private AfterEffectsSDK folder (contains Examples)")
+if(AE_SDK_ROOT)
+ set(AE_EXAMPLES "${AE_SDK_ROOT}/Examples")
+ if(NOT EXISTS "${AE_EXAMPLES}/Headers/AE_GeneralPlug.h")
+  message(FATAL_ERROR "AE_SDK_ROOT must point to the locally licensed AfterEffectsSDK directory")
+ endif()
+ find_program(REZ_EXECUTABLE Rez REQUIRED)
+ add_library(EffectStudioMac MODULE NativeHost.mm)
+ set_target_properties(EffectStudioMac PROPERTIES BUNDLE TRUE BUNDLE_EXTENSION plugin PREFIX ""
+  MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in")
+ target_compile_options(EffectStudioMac PRIVATE -fobjc-arc -Wall -Wextra)
+ target_include_directories(EffectStudioMac PRIVATE "${AE_EXAMPLES}/Headers" "${AE_EXAMPLES}/Headers/SP")
+ target_link_libraries(EffectStudioMac PRIVATE EffectStudioMacUI)
+ add_custom_command(TARGET EffectStudioMac POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:EffectStudioMac>/Resources"
+  COMMAND ${REZ_EXECUTABLE} -d __MACH__ -i "${AE_EXAMPLES}/Headers" -i "${AE_EXAMPLES}/Resources"
+   "${CMAKE_CURRENT_SOURCE_DIR}/EffectStudioPiPL.r"
+   -o "$<TARGET_BUNDLE_CONTENT_DIR:EffectStudioMac>/Resources/EffectStudioMac.rsrc"
+  VERBATIM)
+endif()
