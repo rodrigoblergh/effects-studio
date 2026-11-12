@@ -6,7 +6,7 @@ param([Parameter(Mandatory=$true)][string]$Package,
  [ValidateSet('stable','beta')][string]$Channel='stable')
 $ErrorActionPreference='Stop'
 $repo='rodrigoblergh/effects-studio'
-function Gh([string[]]$Arguments){& gh @Arguments;if($LASTEXITCODE -ne 0){throw 'GitHub operation failed. Feed was not advanced unless its final upload already succeeded.'}}
+function Invoke-GhCLI([string[]]$Arguments){& gh.exe @Arguments;if($LASTEXITCODE -ne 0){throw 'GitHub operation failed. Feed was not advanced unless its final upload already succeeded.'}}
 $envelope=Get-Content -LiteralPath $Manifest -Raw|ConvertFrom-Json
 $payload=[Convert]::FromBase64String($envelope.payload)
 $signature=[Convert]::FromBase64String($envelope.signature)
@@ -28,12 +28,12 @@ if($data.packageBytes -ne $file.Length -or $data.packageSha256 -cne (Get-FileHas
 if([DateTimeOffset]::Parse($data.expiresUtc) -le [DateTimeOffset]::UtcNow){throw 'Manifest expired.'}
 if([IO.Path]::GetFileName($Manifest) -cne ($Channel+'.json')){throw 'Manifest filename must be stable.json or beta.json for its channel.'}
 if(!$PSCmdlet.ShouldProcess($repo,"Publish immutable $VersionTag package, then advance $Channel signed feed")){return}
-Gh @('auth','status','--hostname','github.com')
+Invoke-GhCLI -Arguments @('auth','status','--hostname','github.com')
 # Maintainer must create the distribution tag first. No force tags or package overwrite.
-Gh @('api',"repos/$repo/git/ref/tags/$VersionTag",'--silent')
-& gh release view $VersionTag --repo $repo *> $null
-if($LASTEXITCODE -ne 0){$create=@('release','create',$VersionTag,'--repo',$repo,'--verify-tag','--title',"Effect Studio $($data.version)",'--notes','Signed Effect Studio release.');if($Channel -eq 'beta'){$create+='--prerelease'};Gh $create}
-$releaseJson=& gh release view $VersionTag --repo $repo --json assets
+Invoke-GhCLI -Arguments @('api',"repos/$repo/git/ref/tags/$VersionTag",'--silent')
+& gh.exe release view $VersionTag --repo $repo *> $null
+if($LASTEXITCODE -ne 0){$create=@('release','create',$VersionTag,'--repo',$repo,'--verify-tag','--title',"Effect Studio $($data.version)",'--notes','Signed Effect Studio release.');if($Channel -eq 'beta'){$create+='--prerelease'};Invoke-GhCLI -Arguments $create}
+$releaseJson=& gh.exe release view $VersionTag --repo $repo --json assets
 if($LASTEXITCODE -ne 0){throw 'Could not inspect existing release assets.'}
 $assets=@(($releaseJson|ConvertFrom-Json).assets|Where-Object{$_.name -ceq $file.Name})
 if($assets.Count -gt 1){throw 'Ambiguous existing package assets.'}
@@ -41,15 +41,16 @@ if($assets.Count -eq 1){
  $tempDir=Join-Path ([IO.Path]::GetTempPath()) ('EffectStudioPublish-'+[Guid]::NewGuid().ToString('N'))
  [IO.Directory]::CreateDirectory($tempDir)|Out-Null
  try{
-  Gh @('release','download',$VersionTag,'--repo',$repo,'--pattern',$file.Name,'--dir',$tempDir)
+  Invoke-GhCLI -Arguments @('release','download',$VersionTag,'--repo',$repo,'--pattern',$file.Name,'--dir',$tempDir)
   $download=Join-Path $tempDir $file.Name
   if(!(Test-Path -LiteralPath $download) -or (Get-Item -LiteralPath $download).Length -ne $data.packageBytes -or (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash.ToLowerInvariant() -cne $data.packageSha256){throw 'Existing immutable package differs; it will not be overwritten.'}
  }finally{if(Test-Path -LiteralPath (Join-Path $tempDir $file.Name)){[IO.File]::Delete((Join-Path $tempDir $file.Name))};if([IO.Directory]::Exists($tempDir)){[IO.Directory]::Delete($tempDir,$false)}}
-}else{Gh @('release','upload',$VersionTag,$file.FullName,'--repo',$repo)}
+}else{Invoke-GhCLI -Arguments @('release','upload',$VersionTag,$file.FullName,'--repo',$repo)}
 $feedTag='update-'+$Channel
-& gh release view $feedTag --repo $repo *> $null
-if($LASTEXITCODE -ne 0){Gh @('release','create',$feedTag,'--repo',$repo,'--title',"Effect Studio $Channel update feed",'--notes','Signed update metadata. Packages are stored in immutable version releases.','--prerelease')}
+& gh.exe release view $feedTag --repo $repo *> $null
+if($LASTEXITCODE -ne 0){Invoke-GhCLI -Arguments @('release','create',$feedTag,'--repo',$repo,'--title',"Effect Studio $Channel update feed",'--notes','Signed update metadata. Packages are stored in immutable version releases.','--prerelease')}
 # Mutable feed is updated LAST. This does not overwrite a version package.
-Gh @('release','upload',$feedTag,([IO.Path]::GetFullPath($Manifest)),'--repo',$repo,'--clobber')
+Invoke-GhCLI -Arguments @('release','upload',$feedTag,([IO.Path]::GetFullPath($Manifest)),'--repo',$repo,'--clobber')
 Write-Output "Published $Channel metadata after immutable package upload."
+
 
