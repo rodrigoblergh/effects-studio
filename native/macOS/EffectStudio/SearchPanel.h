@@ -3,7 +3,7 @@
 #include <vector>
 #include <cstdint>
 namespace effectstudio_mac {
-struct Entry { std::string id; std::wstring name, category; std::vector<std::wstring> aliases; };
+struct Entry { std::string id; std::wstring name, category; std::vector<std::wstring> aliases; std::wstring presetPath; };
 // Generation identifies a host-owned snapshot of comp + layer IDs. The AE idle
 // callback MUST revalidate that snapshot before opening its single undo group.
 struct Choice { std::string id; std::uint64_t generation=0; };
