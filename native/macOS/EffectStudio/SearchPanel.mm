@@ -33,7 +33,7 @@ std::optional<std::pair<effectstudio_mac::HostAction,std::uint64_t>> pendingActi
 - (void)keyDown:(NSEvent*)event {if(event.keyCode==36||event.keyCode==76){[NSApp sendAction:@selector(accept) to:self.target from:self];return;}if(event.keyCode==53){[NSApp sendAction:@selector(cancelSearch) to:self.target from:self];return;}[super keyDown:event];}
 @end
 
-@interface ESSearchController : NSObject<NSTextFieldDelegate,NSTableViewDataSource,NSTableViewDelegate,NSWindowDelegate> {
+@interface ESSearchController : NSObject<NSSearchFieldDelegate,NSTableViewDataSource,NSTableViewDelegate,NSWindowDelegate> {
 @public
  std::vector<effectstudio_mac::Entry> catalog;
  std::vector<effectstudio::search::Entry> index;
@@ -41,7 +41,7 @@ std::optional<std::pair<effectstudio_mac::HostAction,std::uint64_t>> pendingActi
  std::map<NSInteger,std::wstring> groupRows;
  std::set<std::wstring> closedGroups;
  effectstudio_mac::Preferences prefs;
- bool browsing=false;
+ bool browsing;
  uint64_t generation;
 }
 @property(nonatomic,strong) ESSearchPanel* panel;
@@ -79,6 +79,7 @@ std::optional<std::pair<effectstudio_mac::HostAction,std::uint64_t>> pendingActi
 @implementation ESSearchController
 - (instancetype)init {
  if(!(self=[super init]))return nil;
+ browsing=false;
  self.panel=[[ESSearchPanel alloc] initWithContentRect:NSMakeRect(0,0,380,220) styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
  self.panel.releasedWhenClosed=NO; self.panel.delegate=self; self.panel.hidesOnDeactivate=YES;
  self.panel.backgroundColor=[NSColor colorWithWhite:0.12 alpha:1]; self.panel.hasShadow=YES;

@@ -10,17 +10,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        include:
+          - runner: xcode-27
+            host_arch: arm64
+            build_arch: arm64
+          - runner: macos-15-intel
+            host_arch: x86_64
+            build_arch: 'arm64;x86_64'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Build native Apple Silicon UI
+      - name: Verify native environment
         run: |
+          set -euo pipefail
           uname -m
-          cmake -S native/macOS/EffectStudio -B build/mac-ui -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-          cmake --build build/mac-ui --parallel 3
-          ctest --test-dir build/mac-ui --output-on-failure
+          test "$(uname -m)" = '${{ matrix.host_arch }}'
+          sw_vers
+          xcodebuild -version
+          clang --version
+          cmake --version
+      - name: Configure SDK-free preview
+        # CaptureCore uses assert(); keep assertions enabled in this CI build.
+        run: cmake -G 'Unix Makefiles' -S native/macOS/EffectStudio -B build/mac-ui -DCMAKE_BUILD_TYPE=Debug -DCMAKE_OSX_ARCHITECTURES='${{ matrix.build_arch }}'
+      - name: Build AppKit preview and core tests
+        run: cmake --build build/mac-ui --parallel 3
+      - name: Run core tests
+        run: ctest --test-dir build/mac-ui --output-on-failure
       - name: Preserve development preview
         run: |
           ditto -c -k --sequesterRsrc --keepParent build/mac-ui/EffectStudioMacPreview.app build/EffectStudioMacPreview.zip
